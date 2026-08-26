@@ -6,7 +6,7 @@ Plataforma independente para distribuir atualizações. O back-end usa Express +
 
 - Autocadastro de cliente e terminal na primeira consulta.
 - Produtos e canais `test`, `beta` e `production`.
-- Upload ZIP pelo painel e SHA-256 automático.
+- Upload ZIP bruto pelo painel, manifesto raiz e SHA-256 automático.
 - Liberação para todos ou clientes selecionados.
 - Dashboard, clientes, terminais, produtos e releases.
 - Cliente Delphi inicial com download, backup e rollback.
@@ -73,6 +73,22 @@ Execute `windows/build-and-deploy.bat`. O destino padrão é `C:\UpdaterCentral`
 ```
 
 O UUID do terminal deve ser persistido. Uma release global atende clientes novos; a direcionada aparece para clientes que já fizeram uma consulta.
+
+## Pacote de atualização
+
+Ao publicar uma versão do tipo pacote, envie o ZIP bruto gerado pelo build do
+front. O backend remove uma pasta raiz comum, quando houver, e grava um ZIP final
+com este formato:
+
+```text
+manifest.json
+nginx/html/index.html
+nginx/html/static/...
+```
+
+O `manifest.json` contém produto, canal, versão, `releaseId` e a lista de
+arquivos com `source`, `destination`, `sha256` e tamanho em bytes. O SHA-256
+cadastrado na release continua sendo o hash do ZIP final servido em `/downloads`.
 
 ## Documentação da API
 
