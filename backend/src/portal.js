@@ -64,6 +64,11 @@ export function registerPortalRoutes(app, { db, adminAuth, installationAuth, sto
         .run(identity.id, text(req.get('x-client-cert-serial')), text(req.get('x-client-cert-issuer')), text(req.get('x-client-cert-subject')), req.get('x-client-cert-fingerprint'), text(req.get('x-client-cert-valid-from')), text(req.get('x-client-cert-valid-to')));
     })();
     audit(req, 'certificate_login_succeeded', 'allowed', { details: { documentType: type } });
+    if (req.query.redirect) {
+      const target = new URL(String(req.query.redirect), `${req.protocol}://${req.get('host')}`);
+      target.searchParams.set('code', code);
+      return res.redirect(target.toString());
+    }
     res.json({ code });
   });
   app.post('/api/v1/portal/auth/exchange', (req, res) => {
