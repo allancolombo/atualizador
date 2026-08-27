@@ -44,7 +44,8 @@ export function registerPortalRoutes(app, { db, adminAuth, installationAuth, sto
   app.post('/api/v1/portal/auth/start', (req, res) => {
     const id = crypto.randomUUID(), state = crypto.randomBytes(24).toString('base64url');
     db.prepare("INSERT INTO portal_auth_state(id,state,expires_at) VALUES(?,?,datetime('now','+10 minutes'))").run(id, state);
-    res.json({ state, certificateUrl: `/api/v1/portal/auth/certificate?state=${state}` });
+    const base = String(process.env.PORTAL_CERTIFICATE_BASE_URL || '').replace(/\/$/, '');
+    res.json({ state, certificateUrl: `${base}/api/v1/portal/auth/certificate?state=${state}` });
   });
   app.get('/api/v1/portal/auth/certificate', (req, res) => {
     const state = db.prepare("SELECT * FROM portal_auth_state WHERE state=? AND used_at IS NULL AND expires_at>CURRENT_TIMESTAMP").get(req.query.state);
