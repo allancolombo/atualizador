@@ -58,7 +58,6 @@ services:
 
     expose:
       - "80"
-      - "443"
 
     volumes:
       - ./certs/nginx:/etc/nginx/certs:ro
