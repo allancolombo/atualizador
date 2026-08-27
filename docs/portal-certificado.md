@@ -20,7 +20,8 @@ PORTAL_CERTIFICATE_BASE_URL=https://cert.atualizacao.goopedir.com
 ```
 
 No `docker-compose.yml` do projeto essa variavel ja fica com esse valor por
-padrao.
+padrao. O `nginx.conf` principal do frontend continua somente em HTTP interno,
+porque no deploy atual o HTTPS e gerenciado pelo Easypanel/proxy externo.
 
 Sem esse host separado exigindo certificado de cliente, o backend responde:
 
@@ -28,11 +29,14 @@ Sem esse host separado exigindo certificado de cliente, o backend responde:
 {"error":"certificate_required"}
 ```
 
-## Exemplo de Nginx para o host de certificado
+## Nginx para o host de certificado
 
-Este bloco deve ficar no proxy que termina TLS para
-`cert.atualizacao.goopedir.com`. Os caminhos dos certificados da CA precisam ser
-ajustados para a cadeia aceita em producao.
+O bloco esta em `docs/nginx-cert-portal.conf` e deve ficar no proxy que termina
+TLS para `cert.atualizacao.goopedir.com`, nao no Nginx HTTP interno do frontend,
+a menos que esse container tambem receba os certificados reais.
+
+Os caminhos dos certificados da CA precisam ser ajustados para a cadeia aceita
+em producao.
 
 ```nginx
 server {

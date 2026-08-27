@@ -59,9 +59,6 @@ services:
     expose:
       - "80"
 
-    volumes:
-      - ./certs/nginx:/etc/nginx/certs:ro
-
     networks:
       - updater-net
       - easypanel
