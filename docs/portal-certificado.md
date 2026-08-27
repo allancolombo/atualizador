@@ -19,6 +19,9 @@ Configure no backend:
 PORTAL_CERTIFICATE_BASE_URL=https://cert.atualizacao.goopedir.com
 ```
 
+No `docker-compose.yml` do projeto essa variavel ja fica com esse valor por
+padrao.
+
 Sem esse host separado exigindo certificado de cliente, o backend responde:
 
 ```json
@@ -36,10 +39,10 @@ server {
     listen 443 ssl;
     server_name cert.atualizacao.goopedir.com;
 
-    ssl_certificate /etc/letsencrypt/live/cert.atualizacao.goopedir.com/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/cert.atualizacao.goopedir.com/privkey.pem;
+    ssl_certificate /etc/nginx/certs/server/fullchain.pem;
+    ssl_certificate_key /etc/nginx/certs/server/privkey.pem;
 
-    ssl_client_certificate /etc/nginx/client-ca/icp-brasil-chain.pem;
+    ssl_client_certificate /etc/nginx/certs/client-ca/icp-brasil-chain.pem;
     ssl_verify_client on;
     ssl_verify_depth 5;
 
@@ -66,6 +69,21 @@ server {
 }
 ```
 
-Observacao: o exemplo acima encaminha o subject inteiro em
-`X-Client-Cert-Document` apenas como ponto de partida. Em producao, extraia
-somente o CPF/CNPJ do certificado e envie esse numero limpo nesse cabecalho.
+## Arquivos esperados no deploy
+
+O container do frontend monta `./certs/nginx` em `/etc/nginx/certs`.
+
+```text
+certs/
+  nginx/
+    server/
+      fullchain.pem
+      privkey.pem
+    client-ca/
+      icp-brasil-chain.pem
+```
+
+Observacao: a regra atual tenta extrair CPF/CNPJ do subject do certificado pelos
+nomes `CPF`, `CNPJ` e pelos OIDs mais comuns da ICP-Brasil. Se a cadeia/proxy
+entregar esses dados em outro formato, ajuste o `map $ssl_client_s_dn
+$client_cert_document` no `nginx.conf`.

@@ -19,7 +19,7 @@ services:
       ADMIN_PASSWORD: ${ADMIN_PASSWORD}
       JWT_SECRET: ${JWT_SECRET}
       INSTALLATION_KEY: ${INSTALLATION_KEY}
-      PORTAL_CERTIFICATE_BASE_URL: ${PORTAL_CERTIFICATE_BASE_URL:-}
+      PORTAL_CERTIFICATE_BASE_URL: ${PORTAL_CERTIFICATE_BASE_URL:-https://cert.atualizacao.goopedir.com}
 
     volumes:
       - backend-data:/app/data
@@ -58,6 +58,10 @@ services:
 
     expose:
       - "80"
+      - "443"
+
+    volumes:
+      - ./certs/nginx:/etc/nginx/certs:ro
 
     networks:
       - updater-net
