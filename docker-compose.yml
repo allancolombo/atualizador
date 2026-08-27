@@ -65,6 +65,15 @@ services:
 
     labels:
       easypanel.ssl: "letsencrypt"
+      traefik.enable: "true"
+      traefik.http.routers.atualizador-cert.rule: "Host(`cert.atualizacao.goopedir.com`) && Path(`/api/v1/portal/auth/certificate`)"
+      traefik.http.routers.atualizador-cert.entrypoints: "websecure"
+      traefik.http.routers.atualizador-cert.tls: "true"
+      traefik.http.routers.atualizador-cert.tls.certresolver: "letsencrypt"
+      traefik.http.routers.atualizador-cert.tls.options: "portal-mtls@file"
+      traefik.http.routers.atualizador-cert.middlewares: "portal-client-cert@file"
+      traefik.http.routers.atualizador-cert.service: "atualizador-cert"
+      traefik.http.services.atualizador-cert.loadbalancer.server.port: "80"
 
 
 volumes:

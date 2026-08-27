@@ -16,6 +16,26 @@ const text = value => value === undefined || value === null || String(value).tri
 const nowIso = () => new Date().toISOString();
 const addDays = days => days ? new Date(Date.now() + Number(days) * 86400000).toISOString() : null;
 const safeJson = value => JSON.stringify(value || {});
+const headerAny = (req, names) => names.map(name => req.get(name)).find(Boolean) || null;
+const forwardedTlsInfo = req => {
+  const raw = headerAny(req, ['x-forwarded-tls-client-cert-info']);
+  if (!raw) return {};
+  const decoded = decodeURIComponent(raw);
+  const pick = name => decoded.match(new RegExp(`${name}=([^;]+)`))?.[1] || null;
+  return {
+    subject: pick('Subject'),
+    issuer: pick('Issuer'),
+    serial: pick('SerialNumber'),
+    notBefore: pick('NotBefore'),
+    notAfter: pick('NotAfter')
+  };
+};
+const extractDocument = value => {
+  const raw = String(value || '');
+  const tagged = raw.match(/(?:CNPJ|OID\.2\.16\.76\.1\.3\.3|2\.16\.76\.1\.3\.3)\s*=?\s*([\d.\-\/]+)/i)
+    || raw.match(/(?:CPF|OID\.2\.16\.76\.1\.3\.1|2\.16\.76\.1\.3\.1)\s*=?\s*([\d.\-\/]+)/i);
+  return digits(tagged?.[1] || raw);
+};
 
 export function registerPortalRoutes(app, { db, adminAuth, installationAuth, storagePath }) {
   const tempPath = path.join(storagePath, 'temporary');
@@ -50,19 +70,29 @@ export function registerPortalRoutes(app, { db, adminAuth, installationAuth, sto
   app.get('/api/v1/portal/auth/certificate', (req, res) => {
     const state = db.prepare("SELECT * FROM portal_auth_state WHERE state=? AND used_at IS NULL AND expires_at>CURRENT_TIMESTAMP").get(req.query.state);
     if (!state) return res.status(400).json({ error: 'invalid_state' });
-    const verified = ['success', '1', 'true'].includes(String(req.get('x-client-cert-verify') || process.env.PORTAL_DEV_CERT_VERIFY || '').toLowerCase());
-    const document = digits(req.get('x-client-cert-document') || req.query.document);
+    const tlsInfo = forwardedTlsInfo(req);
+    const cert = {
+      verify: headerAny(req, ['x-client-cert-verify', 'x-ssl-client-verify', 'ssl-client-verify', 'ssl_client_verify']) || process.env.PORTAL_DEV_CERT_VERIFY,
+      document: headerAny(req, ['x-client-cert-document', 'x-ssl-client-document', 'ssl-client-document', 'ssl_client_document']),
+      subject: headerAny(req, ['x-client-cert-subject', 'x-ssl-client-subject', 'ssl-client-subject', 'ssl_client_s_dn']) || tlsInfo.subject,
+      issuer: headerAny(req, ['x-client-cert-issuer', 'x-ssl-client-issuer', 'ssl-client-issuer', 'ssl_client_i_dn']) || tlsInfo.issuer,
+      serial: headerAny(req, ['x-client-cert-serial', 'x-ssl-client-serial', 'ssl-client-serial', 'ssl_client_serial']) || tlsInfo.serial,
+      fingerprint: headerAny(req, ['x-client-cert-fingerprint', 'x-ssl-client-fingerprint', 'ssl-client-fingerprint', 'ssl_client_fingerprint'])
+    };
+    const verified = Boolean(tlsInfo.subject) || ['success', '1', 'true'].includes(String(cert.verify || '').toLowerCase());
+    const document = extractDocument(cert.document || cert.subject || req.query.document);
     if (!verified || ![11, 14].includes(document.length)) {
-      audit(req, 'certificate_login_failed', 'denied', { details: { reason: 'invalid_certificate_headers' } });
-      return res.status(401).json({ error: 'certificate_required' });
+      const details = { reason: 'invalid_certificate_headers', verify: cert.verify || null, hasSubject: Boolean(cert.subject), hasDocument: Boolean(cert.document), documentLength: document.length };
+      audit(req, 'certificate_login_failed', 'denied', { details });
+      return res.status(401).json(process.env.PORTAL_CERTIFICATE_DEBUG === '1' ? { error: 'certificate_required', details } : { error: 'certificate_required' });
     }
-    const type = document.length === 14 ? 'cnpj' : 'cpf', code = crypto.randomBytes(24).toString('base64url'), name = text(req.get('x-client-cert-subject')) || document;
+    const type = document.length === 14 ? 'cnpj' : 'cpf', code = crypto.randomBytes(24).toString('base64url'), name = text(cert.subject) || document;
     db.transaction(() => {
       db.prepare('UPDATE portal_auth_state SET document=?,identity_type=?,return_code=?,used_at=CURRENT_TIMESTAMP WHERE id=?').run(document, type, code, state.id);
       db.prepare('INSERT INTO portal_identity(identity_type,document,display_name,last_login_at) VALUES(?,?,?,CURRENT_TIMESTAMP) ON CONFLICT(document) DO UPDATE SET last_login_at=CURRENT_TIMESTAMP,display_name=coalesce(excluded.display_name,portal_identity.display_name)').run(type, document, name);
       const identity = db.prepare('SELECT id FROM portal_identity WHERE document=?').get(document);
-      if (req.get('x-client-cert-fingerprint')) db.prepare(`INSERT INTO certificate_identity(portal_identity_id,serial_number,issuer,subject,fingerprint_sha256,valid_from,valid_to,last_used_at) VALUES(?,?,?,?,?,?,?,CURRENT_TIMESTAMP) ON CONFLICT(fingerprint_sha256) DO UPDATE SET last_used_at=CURRENT_TIMESTAMP`)
-        .run(identity.id, text(req.get('x-client-cert-serial')), text(req.get('x-client-cert-issuer')), text(req.get('x-client-cert-subject')), req.get('x-client-cert-fingerprint'), text(req.get('x-client-cert-valid-from')), text(req.get('x-client-cert-valid-to')));
+      if (cert.fingerprint) db.prepare(`INSERT INTO certificate_identity(portal_identity_id,serial_number,issuer,subject,fingerprint_sha256,valid_from,valid_to,last_used_at) VALUES(?,?,?,?,?,?,?,CURRENT_TIMESTAMP) ON CONFLICT(fingerprint_sha256) DO UPDATE SET last_used_at=CURRENT_TIMESTAMP`)
+        .run(identity.id, text(cert.serial), text(cert.issuer), text(cert.subject), cert.fingerprint, text(req.get('x-client-cert-valid-from') || tlsInfo.notBefore), text(req.get('x-client-cert-valid-to') || tlsInfo.notAfter));
     })();
     audit(req, 'certificate_login_succeeded', 'allowed', { details: { documentType: type } });
     if (req.query.redirect) {

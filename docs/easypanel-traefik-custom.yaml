@@ -1,0 +1,31 @@
+tls:
+  options:
+    portal-mtls:
+      clientAuth:
+        caFiles:
+          - /etc/easypanel/traefik/client-ca/icp-brasil-chain.pem
+        clientAuthType: RequireAndVerifyClientCert
+
+http:
+  middlewares:
+    portal-client-cert:
+      passTLSClientCert:
+        pem: false
+        info:
+          notAfter: true
+          notBefore: true
+          serialNumber: true
+          subject:
+            commonName: true
+            serialNumber: true
+            country: true
+            organization: true
+            organizationalUnit: true
+            domainComponent: true
+          issuer:
+            commonName: true
+            serialNumber: true
+            country: true
+            organization: true
+            organizationalUnit: true
+            domainComponent: true
