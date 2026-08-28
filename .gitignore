@@ -19,3 +19,4 @@ delphi/Win64/
 .env
 .env.*
 !.env.example
+/atualizador-main
