@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import AdmZip from 'adm-zip';
-import { buildUpdatePackageFromZip, getReleasePolicy, normalizeFutureDeadline } from '../src/release.js';
+import { buildUpdatePackageFromZip, getReleasePolicy, inspectPackageZip, normalizeFutureDeadline } from '../src/release.js';
 
 const now = Date.parse('2026-08-24T12:00:00.000Z');
 
@@ -50,6 +50,34 @@ test('builds final package with root manifest and nginx html destinations', () =
     assert.equal(savedManifest.files.length, 2);
     assert.equal(savedManifest.files[0].destination, 'nginx/html/index.html');
     assert.match(savedManifest.files[0].sha256, /^[a-f0-9]{64}$/);
+  } finally {
+    fs.rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test('adds extra files to package root and exposes them through manifest inspection', () => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'central-atualizacao-root-files-'));
+  const source = path.join(directory, 'build.zip');
+  const final = path.join(directory, 'final.zip');
+  const zip = new AdmZip();
+  zip.addFile('dist/app.exe', Buffer.from('binary'));
+  zip.writeZip(source);
+
+  try {
+    buildUpdatePackageFromZip(source, final, {
+      product: 'pdv',
+      channel: 'test',
+      version: '1.2.4',
+      releaseId: 43,
+      rootFiles: [{ originalname: 'config.json', data: Buffer.from('{"ok":true}') }]
+    });
+    const output = new AdmZip(final);
+    const names = output.getEntries().map(entry => entry.entryName).sort();
+    const inspection = inspectPackageZip(final);
+
+    assert.deepEqual(names, ['config.json', 'manifest.json', 'nginx/html/app.exe']);
+    assert.equal(inspection.hasManifest, true);
+    assert.deepEqual(inspection.files.map(file => file.destination), ['config.json', 'nginx/html/app.exe']);
   } finally {
     fs.rmSync(directory, { recursive: true, force: true });
   }
