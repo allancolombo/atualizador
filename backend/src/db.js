@@ -7,7 +7,7 @@ export function openDatabase(databasePath) {
   db.pragma('journal_mode = WAL'); db.pragma('busy_timeout = 5000'); db.pragma('foreign_keys = ON');
   db.exec(`
     CREATE TABLE IF NOT EXISTS product(id INTEGER PRIMARY KEY AUTOINCREMENT,code TEXT NOT NULL UNIQUE,name TEXT NOT NULL,active INTEGER NOT NULL DEFAULT 1,created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP);
-    CREATE TABLE IF NOT EXISTS client(id INTEGER PRIMARY KEY AUTOINCREMENT,external_id TEXT NOT NULL UNIQUE,name TEXT NOT NULL,document TEXT,first_seen_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,last_seen_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP);
+    CREATE TABLE IF NOT EXISTS client(id INTEGER PRIMARY KEY AUTOINCREMENT,external_id TEXT NOT NULL UNIQUE,name TEXT NOT NULL,document TEXT,notes TEXT,first_seen_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,last_seen_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP);
     CREATE TABLE IF NOT EXISTS terminal(id INTEGER PRIMARY KEY AUTOINCREMENT,external_id TEXT NOT NULL UNIQUE,client_id INTEGER NOT NULL,name TEXT NOT NULL,computer_name TEXT,product_code TEXT NOT NULL,channel TEXT NOT NULL DEFAULT 'production',current_version TEXT NOT NULL DEFAULT '0.0.0',os_version TEXT,first_seen_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,last_seen_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,FOREIGN KEY(client_id) REFERENCES client(id));
     CREATE TABLE IF NOT EXISTS release(id INTEGER PRIMARY KEY AUTOINCREMENT,product_id INTEGER NOT NULL,version TEXT NOT NULL,channel TEXT NOT NULL CHECK(channel IN ('test','beta','production')),file_path TEXT NOT NULL,sha256 TEXT NOT NULL,size_bytes INTEGER NOT NULL,mandatory INTEGER NOT NULL DEFAULT 0,minimum_version TEXT,notes TEXT,active INTEGER NOT NULL DEFAULT 1,published_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,FOREIGN KEY(product_id) REFERENCES product(id),UNIQUE(product_id,version,channel));
     CREATE TABLE IF NOT EXISTS ci_artifact(id TEXT PRIMARY KEY,user_id INTEGER NOT NULL,product_code TEXT NOT NULL,version TEXT NOT NULL,channel TEXT NOT NULL CHECK(channel IN ('test','beta','production')),file_path TEXT NOT NULL,original_name TEXT NOT NULL,sha256 TEXT NOT NULL,size_bytes INTEGER NOT NULL,created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,consumed_at TEXT,FOREIGN KEY(user_id) REFERENCES app_user(id));
@@ -54,6 +54,7 @@ export function openDatabase(databasePath) {
   ensureColumn(db, 'release', 'technical_notes', 'TEXT');
   ensureColumn(db, 'release', 'show_notes_pdv', 'INTEGER NOT NULL DEFAULT 0');
   ensureColumn(db, 'release', 'published_by', 'INTEGER');
+  ensureColumn(db, 'client', 'notes', 'TEXT');
   ensureColumn(db, 'app_user', 'api_token_hash', 'TEXT');
   ensureColumn(db, 'app_user', 'api_token_created_at', 'TEXT');
   ensureColumn(db, 'ci_artifact', 'user_id', 'INTEGER');
