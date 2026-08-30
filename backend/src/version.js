@@ -16,3 +16,12 @@ export function compareVersions(a, b) {
   }
   return 0;
 }
+
+export function findUpdateRelease(releases, currentVersion) {
+  const available = [...(releases || [])].sort((a, b) => Number(b.id || 0) - Number(a.id || 0));
+  const current = String(currentVersion || '').trim();
+  const currentRelease = available.find(release => String(release.version || '').trim() === current);
+  if (!available.length) return null;
+  if (!currentRelease) return available[0];
+  return available.find(release => Number(release.id || 0) > Number(currentRelease.id || 0)) || null;
+}
