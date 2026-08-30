@@ -27,13 +27,6 @@ function normalizedZipPath(value) {
   return normalized;
 }
 
-function stripCommonRoot(paths) {
-  if (!paths.length) return paths;
-  const first = paths[0].split('/')[0];
-  if (!first || paths.some(item => !item.startsWith(`${first}/`))) return paths;
-  return paths.map(item => item.slice(first.length + 1)).filter(Boolean);
-}
-
 function safeRootFileName(value) {
   const normalized = path.basename(String(value || '').replace(/\\/g, '/')).trim();
   if (!normalized || normalized.includes('\0') || normalized === '.' || normalized === '..') throw new Error('invalid_root_file');
@@ -66,7 +59,7 @@ export function inspectPackageZip(zipPath) {
   };
 }
 
-export function buildUpdatePackageFromZip(sourceZipPath, finalZipPath, { product, channel, version, releaseId, destinationRoot = 'nginx/html', rootFiles = [] }) {
+export function buildUpdatePackageFromZip(sourceZipPath, finalZipPath, { product, channel, version, releaseId, rootFiles = [] }) {
   const input = new AdmZip(sourceZipPath);
   const entries = input.getEntries()
     .filter(entry => !entry.isDirectory)
@@ -74,12 +67,10 @@ export function buildUpdatePackageFromZip(sourceZipPath, finalZipPath, { product
     .filter(item => !['manifest.json', 'manifesto.json'].includes(path.basename(item.source).toLowerCase()));
   if (!entries.length && !rootFiles.length) throw new Error('empty_package');
 
-  const stripped = stripCommonRoot(entries.map(item => item.source));
   const output = new AdmZip();
   const files = entries.map((item, index) => {
-    const relative = normalizedZipPath(stripped[index]);
+    const destination = normalizedZipPath(item.source);
     const data = item.entry.getData();
-    const destination = `${destinationRoot}/${relative}`;
     output.addFile(destination, data);
     return {
       source: item.source,

@@ -30,7 +30,7 @@ test('requires a valid future deadline', () => {
   assert.throws(() => normalizeFutureDeadline('2026-08-23T12:00:00.000Z', now), /deadline_must_be_future/);
 });
 
-test('builds final package with root manifest and nginx html destinations', () => {
+test('builds final package with root manifest and preserves zip destinations', () => {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'central-atualizacao-package-'));
   const source = path.join(directory, 'build.zip');
   const final = path.join(directory, 'final.zip');
@@ -46,9 +46,9 @@ test('builds final package with root manifest and nginx html destinations', () =
     const savedManifest = JSON.parse(output.readAsText('manifest.json'));
 
     assert.equal(manifest.releaseId, '42');
-    assert.deepEqual(names, ['manifest.json', 'nginx/html/index.html', 'nginx/html/static/js/main.js']);
+    assert.deepEqual(names, ['dist/index.html', 'dist/static/js/main.js', 'manifest.json']);
     assert.equal(savedManifest.files.length, 2);
-    assert.equal(savedManifest.files[0].destination, 'nginx/html/index.html');
+    assert.equal(savedManifest.files[0].destination, 'dist/index.html');
     assert.match(savedManifest.files[0].sha256, /^[a-f0-9]{64}$/);
   } finally {
     fs.rmSync(directory, { recursive: true, force: true });
@@ -75,9 +75,9 @@ test('adds extra files to package root and exposes them through manifest inspect
     const names = output.getEntries().map(entry => entry.entryName).sort();
     const inspection = inspectPackageZip(final);
 
-    assert.deepEqual(names, ['config.json', 'manifest.json', 'nginx/html/app.exe']);
+    assert.deepEqual(names, ['config.json', 'dist/app.exe', 'manifest.json']);
     assert.equal(inspection.hasManifest, true);
-    assert.deepEqual(inspection.files.map(file => file.destination), ['config.json', 'nginx/html/app.exe']);
+    assert.deepEqual(inspection.files.map(file => file.destination), ['config.json', 'dist/app.exe']);
   } finally {
     fs.rmSync(directory, { recursive: true, force: true });
   }
