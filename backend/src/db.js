@@ -44,6 +44,12 @@ export function openDatabase(databasePath) {
     CREATE INDEX IF NOT EXISTS idx_client_file_client ON client_file(client_id,category,status,uploaded_at DESC);
     CREATE INDEX IF NOT EXISTS idx_client_file_duplicate ON client_file(client_id,category,sha256,reference_date);
     CREATE INDEX IF NOT EXISTS idx_portal_audit_created ON portal_audit_event(created_at DESC);
+    CREATE TABLE IF NOT EXISTS remote_access_link(id TEXT PRIMARY KEY,token_hash TEXT NOT NULL UNIQUE,client_id INTEGER NOT NULL,note TEXT,created_by INTEGER,created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,expires_at TEXT NOT NULL,used_at TEXT,revoked_at TEXT,FOREIGN KEY(client_id) REFERENCES client(id),FOREIGN KEY(created_by) REFERENCES app_user(id));
+    CREATE TABLE IF NOT EXISTS remote_access(id INTEGER PRIMARY KEY AUTOINCREMENT,client_id INTEGER NOT NULL,terminal_id INTEGER UNIQUE,link_id TEXT,remote_id TEXT NOT NULL UNIQUE,computer_name TEXT,source TEXT NOT NULL CHECK(source IN ('installer','check')),password_salt TEXT,password_iv TEXT,password_auth_tag TEXT,password_ciphertext TEXT,password_hmac TEXT,password_updated_at TEXT,first_seen_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,last_seen_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,FOREIGN KEY(client_id) REFERENCES client(id),FOREIGN KEY(terminal_id) REFERENCES terminal(id),FOREIGN KEY(link_id) REFERENCES remote_access_link(id));
+    CREATE TABLE IF NOT EXISTS remote_access_event(id INTEGER PRIMARY KEY AUTOINCREMENT,remote_access_id INTEGER,link_id TEXT,user_id INTEGER,action TEXT NOT NULL,ip TEXT,created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,FOREIGN KEY(remote_access_id) REFERENCES remote_access(id) ON DELETE CASCADE,FOREIGN KEY(link_id) REFERENCES remote_access_link(id),FOREIGN KEY(user_id) REFERENCES app_user(id));
+    CREATE INDEX IF NOT EXISTS idx_remote_access_client ON remote_access(client_id,last_seen_at DESC);
+    CREATE INDEX IF NOT EXISTS idx_remote_access_link_client ON remote_access_link(client_id,created_at DESC);
+    CREATE INDEX IF NOT EXISTS idx_remote_access_event_access ON remote_access_event(remote_access_id,created_at DESC);
   `);
 
   ensureColumn(db, 'release', 'artifact_type', "TEXT NOT NULL DEFAULT 'package'");

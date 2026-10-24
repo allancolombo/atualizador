@@ -10,7 +10,7 @@
   },
   "dependencies": {
     "adm-zip": "^0.6.0",
-    "better-sqlite3": "^11.8.1",
+    "better-sqlite3": "^12.11.1",
     "dotenv": "^16.4.7",
     "express": "^4.21.2",
     "helmet": "^8.0.0",
