@@ -1,6 +1,7 @@
 import Database from 'better-sqlite3';
 import fs from 'node:fs';
 import path from 'node:path';
+import { ensureModuleSchema } from './modules.js';
 export function openDatabase(databasePath) {
   fs.mkdirSync(path.dirname(databasePath), { recursive: true });
   const db = new Database(databasePath);
@@ -78,6 +79,7 @@ export function openDatabase(databasePath) {
       UPDATE application_error SET received_at=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id=NEW.id;
     END;
   `);
+  ensureModuleSchema(db);
   db.pragma('optimize');
   return db;
 }
