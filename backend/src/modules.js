@@ -44,6 +44,7 @@ export const MODULE_CATALOG = [
   { key: 'fidelidade', name: 'Fidelidade', group: 'Vendas online', legacy: 'fidelidade' },
   { key: 'cupom', name: 'Cupom de desconto', group: 'Vendas online', legacy: 'desconto' },
   { key: 'roleta', name: 'Roleta', group: 'Vendas online', depends: ['cupom'] },
+  { key: 'recuperacao', name: 'Recuperação de vendas', group: 'Vendas online', depends: ['cupom'] },
   { key: 'whatsapp', name: 'WhatsApp', group: 'Vendas online', legacy: 'whatsapp' },
   { key: 'marketing', name: 'Marketing', group: 'Vendas online', depends: ['whatsapp'], status: 'beta', legacy: 'campanha', limits: ['mensagens'] },
   { key: 'ifood', name: 'iFood', group: 'Vendas online', legacy: 'ifood' },
@@ -59,7 +60,7 @@ const DELIVERY_INCLUDED = [...SITE_INCLUDED, 'venda_balcao', 'caixa', 'motoboy',
 const SALAO_INCLUDED = [...DELIVERY_INCLUDED, 'mesas', { key: 'mesas.garcom', limits: { aparelhos: 2 } }, 'totem'];
 const MAX_INCLUDED = [...SALAO_INCLUDED.filter(item => item.key !== 'mesas.garcom'), 'mesas.garcom', 'painel_tv', 'financeiro', 'fidelidade', 'roleta', { key: 'marketing', limits: { mensagens: 500 } }, 'ia'];
 const ADDONS_FROM_SITE = ['relatorios', 'fiscal', 'fiscal.nfce', 'fiscal.contabilidade', 'fiscal.dfe', 'fiscal.entrada', 'balanca.peso', 'balanca.comanda', 'filial', 'pagamento_online.stripe', 'dominio_proprio'];
-const ADDONS_FROM_DELIVERY = [...ADDONS_FROM_SITE, 'custo.insumos', 'custo.ficha', 'custo.cmv', 'custo.projecao', 'custo.historico', 'custo.producao', 'estoque', 'estoque.insumos', 'motoboy.app', 'motoboy.localizacao', 'fiado.nfce'];
+const ADDONS_FROM_DELIVERY = [...ADDONS_FROM_SITE, 'custo.insumos', 'custo.ficha', 'custo.cmv', 'custo.projecao', 'custo.historico', 'custo.producao', 'estoque', 'estoque.insumos', 'motoboy.app', 'motoboy.localizacao', 'fiado.nfce', 'recuperacao'];
 const ADDONS_FROM_SALAO = [...ADDONS_FROM_DELIVERY, 'mesas.garcom', 'tablet'];
 export const PLAN_SEED = [
   { code: 'goo_site', name: 'Goo Site', included: SITE_INCLUDED, available: ADDONS_FROM_SITE },
@@ -101,6 +102,7 @@ export function ensureModuleSchema(db) {
   if (!db.prepare('PRAGMA table_info(plan_module)').all().some(item => item.name === 'mode')) db.exec("ALTER TABLE plan_module ADD COLUMN mode TEXT NOT NULL DEFAULT 'included'");
   if (!db.prepare('PRAGMA table_info(crm_group)').all().some(item => item.name === 'unlimited_keys')) db.exec("ALTER TABLE crm_group ADD COLUMN unlimited_keys TEXT NOT NULL DEFAULT '[]'");
   db.transaction(() => {
+    const existentes = new Set(db.prepare('SELECT key FROM module').all().map(item => item.key));
     MODULE_CATALOG.forEach((item, index) => upsert.run(item.key, item.name, item.group, JSON.stringify(item.depends || []), item.status || 'ativo', JSON.stringify(item.limits || []), item.legacy || null, index));
     // motoboy.rotas virou motoboy.localizacao.
     for (const table of ['plan_module', 'license_module']) db.prepare(`UPDATE OR IGNORE ${table} SET module_key='motoboy.localizacao' WHERE module_key='motoboy.rotas'`).run();
@@ -108,6 +110,7 @@ export function ensureModuleSchema(db) {
     for (const table of ['plan_module', 'license_module']) db.prepare(`DELETE FROM ${table} WHERE module_key NOT IN (${marks})`).run(...keys);
     db.prepare(`DELETE FROM module WHERE key NOT IN (${marks})`).run(...keys);
     if (!db.prepare('SELECT 1 FROM plan LIMIT 1').get()) seedPlans(db);
+    else if (existentes.size) addNewModulesToPlans(db, existentes);
   })();
 }
 
@@ -123,6 +126,26 @@ function seedPlans(db) {
       insertModule.run(id, key, item.limits ? JSON.stringify(item.limits) : null, 'included');
     }
     for (const key of plan.available) if (!included.has(key)) insertModule.run(id, key, null, 'available');
+  }
+}
+
+// Módulo novo no catálogo entra nos planos que já existem como no PLAN_SEED, só na primeira vez:
+// depois disso o que vale é o que foi ajustado no painel.
+function addNewModulesToPlans(db, existentes) {
+  const novos = new Set(MODULE_CATALOG.map(item => item.key).filter(key => !existentes.has(key)));
+  if (!novos.size) return;
+  const plano = db.prepare('SELECT id FROM plan WHERE code=?');
+  const inserir = db.prepare('INSERT OR IGNORE INTO plan_module(plan_id,module_key,limits,mode) VALUES(?,?,?,?)');
+  for (const plan of PLAN_SEED) {
+    const id = plano.get(plan.code)?.id;
+    if (!id) continue;
+    const included = new Set();
+    for (const item of plan.included) {
+      const key = typeof item === 'string' ? item : item.key;
+      included.add(key);
+      if (novos.has(key)) inserir.run(id, key, item.limits ? JSON.stringify(item.limits) : null, 'included');
+    }
+    for (const key of plan.available) if (novos.has(key) && !included.has(key)) inserir.run(id, key, null, 'available');
   }
 }
 

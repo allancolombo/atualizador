@@ -96,7 +96,7 @@ Criados na primeira subida (`PLAN_SEED` em `backend/src/modules.js`). Cada plano
 | Adicional a partir de | Módulos |
 | --- | --- |
 | Goo Site | `relatorios`, `fiscal`, `fiscal.nfce`, `fiscal.contabilidade`, `fiscal.dfe`, `fiscal.entrada`, `balanca.peso`, `balanca.comanda`, `filial`, `pagamento_online.stripe`, `dominio_proprio` |
-| Goo Delivery | os `custo.*`, `estoque`, `estoque.insumos`, `motoboy.app`, `motoboy.localizacao`, `fiado.nfce` |
+| Goo Delivery | os `custo.*`, `estoque`, `estoque.insumos`, `motoboy.app`, `motoboy.localizacao`, `fiado.nfce`, `recuperacao` |
 | Goo Salão | `mesas.garcom` (aparelho extra), `tablet` |
 
 - O plano liga só o que inclui. O adicional liga pelo grupo do CRM ou por exceção no painel.
