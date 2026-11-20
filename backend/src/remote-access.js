@@ -147,6 +147,34 @@ function Invoke-RustDesk([string[]]$Arguments) {
   if ($process.ExitCode -ne 0) { Write-Warning "RustDesk retornou $($process.ExitCode) em $($Arguments[0])" }
 }
 
+# O --option passa pelo serviço do RustDesk e sai com 0 mesmo quando o serviço
+# ainda não subiu, então cada valor é lido de volta e reenviado até conferir.
+function Wait-RustDeskService {
+  for ($i = 0; $i -lt 90; $i++) {
+    $service = Get-Service -Name 'RustDesk' -ErrorAction SilentlyContinue
+    if ($service -and $service.Status -eq 'Running') { Start-Sleep -Seconds 3; return }
+    if ($service -and $service.Status -eq 'Stopped') { Start-Service -Name 'RustDesk' -ErrorAction SilentlyContinue }
+    Start-Sleep -Seconds 1
+  }
+  throw 'O servico do RustDesk nao iniciou.'
+}
+
+function Get-RustDeskOption([string]$Name) {
+  return ((& $Exe --option $Name | Out-String).Trim())
+}
+
+function Set-RustDeskOption([string]$Name, [string]$Value) {
+  $read = $null
+  for ($attempt = 1; $attempt -le 10; $attempt++) {
+    Invoke-RustDesk @('--option', $Name, $Value)
+    Start-Sleep -Seconds 1
+    $read = Get-RustDeskOption $Name
+    if ($read -eq $Value) { return }
+    Start-Sleep -Seconds 2
+  }
+  throw "Nao foi possivel configurar '$Name' no RustDesk (lido: '$read')."
+}
+
 Write-Host 'Instalando acesso remoto Goopedir...'
 if (-not (Test-Path $Exe)) {
   $Setup = Join-Path $env:TEMP ("rustdesk-" + [guid]::NewGuid().ToString('N') + '.exe')
@@ -158,15 +186,19 @@ if (-not (Test-Path $Exe)) {
   if (-not (Test-Path $Exe)) { throw 'O RustDesk nao foi instalado.' }
 }
 
-Invoke-RustDesk @('--option', 'custom-rendezvous-server', $IdServer)
-Invoke-RustDesk @('--option', 'relay-server', $RelayServer)
-Invoke-RustDesk @('--option', 'key', $ServerKey)
+Wait-RustDeskService
+Set-RustDeskOption 'custom-rendezvous-server' $IdServer
+Set-RustDeskOption 'relay-server' $RelayServer
+Set-RustDeskOption 'key' $ServerKey
 
 $Bytes = New-Object byte[] 24
 [Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($Bytes)
 $Password = ([Convert]::ToBase64String($Bytes) -replace '[^A-Za-z0-9]', '').Substring(0, 16)
 Invoke-RustDesk @('--password', $Password)
 Restart-Service -Name 'RustDesk' -ErrorAction SilentlyContinue
+Wait-RustDeskService
+if ((Get-RustDeskOption 'custom-rendezvous-server') -ne $IdServer -or (Get-RustDeskOption 'key') -ne $ServerKey) { throw 'O RustDesk perdeu a configuracao do servidor ao reiniciar.' }
+Write-Host "Servidor configurado: $IdServer"
 
 $RemoteId = $null
 for ($i = 0; $i -lt 30 -and -not $RemoteId; $i++) {

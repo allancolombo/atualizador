@@ -58,7 +58,11 @@ O link baixa `instalar-acesso-remoto-goopedir.cmd`, que:
 1. pede elevação (UAC) e usa o PowerShell 64 bits;
 2. baixa o script do próprio link (`/install/{token}/script`);
 3. instala o RustDesk com `--silent-install`, se ainda não estiver instalado;
-4. aplica `custom-rendezvous-server`, `relay-server` e `key` com `--option`;
+4. espera o serviço `RustDesk` ficar em execução e aplica `custom-rendezvous-server`,
+   `relay-server` e `key` com `--option`, lendo cada valor de volta e repetindo até
+   conferir (até 10 tentativas). O `--option` passa pelo serviço e sai com código 0
+   mesmo quando ele ainda não subiu, o que deixava máquinas novas instaladas sem
+   configuração. Se não conferir, o script para antes de registrar;
 5. gera uma senha aleatória de 16 caracteres e aplica com `--password`;
 6. lê o ID com `--get-id`;
 7. grava o registro do Windows (seção 4);

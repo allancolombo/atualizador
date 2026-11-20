@@ -92,6 +92,10 @@ test('escapes values embedded in the installer script', () => {
   assert.match(script, /\$Token = 'tok''en'/);
   assert.match(script, /\$ServerKey = 'ab''c'/);
   assert.match(script, /HKLM:\\SOFTWARE\\Goopedir\\AcessoRemoto/);
+  // A configuração só vale depois que o serviço sobe e o valor é lido de volta.
+  assert.match(script, /Wait-RustDeskService\r?\nSet-RustDeskOption 'custom-rendezvous-server' \$IdServer/);
+  assert.match(script, /Set-RustDeskOption 'key' \$ServerKey/);
+  assert.doesNotMatch(script, /Invoke-RustDesk @\('--option', 'key'/);
   const cmd = buildInstallerCmd({ scriptUrl: 'https://central/api/v1/remote-access/install/abc/script' });
   assert.match(cmd, /\r\n/);
   assert.match(cmd, /install\/abc\/script/);
